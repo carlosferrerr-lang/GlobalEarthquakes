@@ -1,3 +1,6 @@
+Acceso publica a la aplicacion
+https://globalearthquakes.onrender.com/
+
 Análisis Global de Terremotos (1995–2023)
 Este proyecto nace con el objetivo de demostrar el potencial de la ciencia de datos en el procesamiento, análisis y visualización de fenómenos naturales complejos. A través del estudio de más de 25 años de registros sísmicos globales, la aplicación transforma datos crudos en conocimiento accionable, permitiendo explorar patrones espaciales, distribuciones de magnitud y variables de impacto en una interfaz totalmente interactiva.
 
