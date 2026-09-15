@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import statsmodels.formula.api as smf
@@ -23,6 +24,7 @@ TRANSLATIONS = {
         "depth_axis": "Profundidad (km)",
         "mag_axis": "Magnitud",
         "count_axis": "Frecuencia (Cantidad de Sismos)",
+        "trendline": "Línea de Tendencia",
         "ols_header": "Resumen del Modelo Estadístico (OLS)"
     },
     "English": {
@@ -42,6 +44,7 @@ TRANSLATIONS = {
         "depth_axis": "Depth (km)",
         "mag_axis": "Magnitude",
         "count_axis": "Frequency (Count of Earthquakes)",
+        "trendline": "Trendline",
         "ols_header": "Statistical Model Summary (OLS)"
     }
 }
@@ -91,10 +94,11 @@ def load_and_clean_data(file_path: str = "earthquake_1995-2023.csv") -> pd.DataF
 
 
 def render_dashboard(df: pd.DataFrame, t_dict: dict):
-    """Genera y despliega las visualizaciones separadas con saltos HTML y títulos en negrilla."""
+    """Genera y despliega las visualizaciones separadas con saltos HTML y línea de tendencia."""
     required_cols = {"latitude", "longitude", "magnitude", "depth"}
     if not required_cols.issubset(df.columns):
-        st.warning(t_dict["missing_cols"].format(cols=required_cols - set(df.columns)))
+        st.warning(t_dict["missing_cols"].format(
+            cols=required_cols - set(df.columns)))
         return
 
     # Slider interactivo de magnitud
@@ -110,11 +114,12 @@ def render_dashboard(df: pd.DataFrame, t_dict: dict):
     )
 
     df_filtered = df[
-        (df["magnitude"] >= selected_mag_range[0]) & 
+        (df["magnitude"] >= selected_mag_range[0]) &
         (df["magnitude"] <= selected_mag_range[1])
     ]
 
-    st.caption(t_dict["caption"].format(filtered=len(df_filtered), total=len(df)))
+    st.caption(t_dict["caption"].format(
+        filtered=len(df_filtered), total=len(df)))
 
     if df_filtered.empty:
         st.info(t_dict["no_data"])
@@ -160,13 +165,16 @@ def render_dashboard(df: pd.DataFrame, t_dict: dict):
     # Espaciado con 2 saltos de línea HTML
     st.markdown("<br><br>", unsafe_allow_html=True)
 
-    # 2. Scatter Profundidad vs Magnitud
+    # 2. Scatter Profundidad vs Magnitud + Línea de Tendencia
     fig_scatter = go.Figure()
+
+    # Puntos de dispersión
     fig_scatter.add_trace(
         go.Scatter(
             x=df_filtered["depth"],
             y=df_filtered["magnitude"],
             mode="markers",
+            name="Sismos",
             text=df_filtered["title"] if "title" in df_filtered.columns else df_filtered["location"],
             marker=dict(
                 size=8,
@@ -177,6 +185,27 @@ def render_dashboard(df: pd.DataFrame, t_dict: dict):
             )
         )
     )
+
+    # Cálculo y trazado de la línea de tendencia lineal (regresión OLS simple)
+    clean_scatter = df_filtered[["depth", "magnitude"]].dropna()
+    if len(clean_scatter) > 1:
+        x_data = clean_scatter["depth"]
+        y_data = clean_scatter["magnitude"]
+        m, b = np.polyfit(x_data, y_data, 1)
+
+        x_trend = np.linspace(x_data.min(), x_data.max(), 100)
+        y_trend = m * x_trend + b
+
+        fig_scatter.add_trace(
+            go.Scatter(
+                x=x_trend,
+                y=y_trend,
+                mode="lines",
+                name=t_dict["trendline"],
+                line=dict(color="#1F77B4", width=3, dash="dash")
+            )
+        )
+
     fig_scatter.update_xaxes(title_text=t_dict["depth_axis"])
     fig_scatter.update_yaxes(title_text=t_dict["mag_axis"])
     fig_scatter.update_layout(
@@ -186,7 +215,7 @@ def render_dashboard(df: pd.DataFrame, t_dict: dict):
             xanchor="center"
         ),
         height=400,
-        showlegend=False,
+        showlegend=True,
         template="plotly_white",
         margin=dict(l=10, r=10, t=50, b=10)
     )
@@ -235,7 +264,7 @@ def run_ols_regression(df: pd.DataFrame, t_dict: dict):
         return
 
     model = smf.ols("sig ~ magnitude + depth", data=data_model).fit()
-    
+
     st.subheader(t_dict["ols_header"])
     st.text(str(model.summary()))
 
