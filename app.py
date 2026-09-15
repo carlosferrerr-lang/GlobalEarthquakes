@@ -1,11 +1,10 @@
 import os
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import statsmodels.formula.api as smf
 import streamlit as st
 
-# Diccionario de traducciones extendido con el histograma
+# Diccionario de traducciones
 TRANSLATIONS = {
     "Español": {
         "page_title": "Análisis Global de Terremotos",
@@ -92,11 +91,10 @@ def load_and_clean_data(file_path: str = "earthquake_1995-2023.csv") -> pd.DataF
 
 
 def render_dashboard(df: pd.DataFrame, t_dict: dict):
-    """Genera y despliega las visualizaciones dinámicas incluyendo el histograma de magnitudes."""
+    """Genera y despliega las visualizaciones separadas con saltos HTML y títulos en negrilla."""
     required_cols = {"latitude", "longitude", "magnitude", "depth"}
     if not required_cols.issubset(df.columns):
-        st.warning(t_dict["missing_cols"].format(
-            cols=required_cols - set(df.columns)))
+        st.warning(t_dict["missing_cols"].format(cols=required_cols - set(df.columns)))
         return
 
     # Slider interactivo de magnitud
@@ -112,32 +110,19 @@ def render_dashboard(df: pd.DataFrame, t_dict: dict):
     )
 
     df_filtered = df[
-        (df["magnitude"] >= selected_mag_range[0]) &
+        (df["magnitude"] >= selected_mag_range[0]) & 
         (df["magnitude"] <= selected_mag_range[1])
     ]
 
-    st.caption(t_dict["caption"].format(
-        filtered=len(df_filtered), total=len(df)))
+    st.caption(t_dict["caption"].format(filtered=len(df_filtered), total=len(df)))
 
     if df_filtered.empty:
         st.info(t_dict["no_data"])
         return
 
-    # Construcción de subplots (3 filas x 1 columna)
-    fig = make_subplots(
-        rows=3, cols=1,
-        subplot_titles=(
-            t_dict["sub_geo"].format(
-                min_m=selected_mag_range[0], max_m=selected_mag_range[1]),
-            t_dict["sub_scatter"],
-            t_dict["sub_hist"]
-        ),
-        specs=[[{"type": "geo"}], [{"type": "xy"}], [{"type": "xy"}]],
-        vertical_spacing=0.08
-    )
-
-    # 1. Mapa interactivo (Fila 1)
-    fig.add_trace(
+    # 1. Mapa interactivo
+    fig_geo = go.Figure()
+    fig_geo.add_trace(
         go.Scattergeo(
             lat=df_filtered["latitude"],
             lon=df_filtered["longitude"],
@@ -148,15 +133,36 @@ def render_dashboard(df: pd.DataFrame, t_dict: dict):
                 size=df_filtered["magnitude"] * 2.5,
                 color=df_filtered["depth"],
                 colorscale="Viridis_r",
-                colorbar=dict(title=t_dict["depth_colorbar"], len=0.3, y=0.85),
+                colorbar=dict(title=t_dict["depth_colorbar"]),
                 showscale=True
             )
-        ),
-        row=1, col=1
+        )
     )
+    fig_geo.update_geos(
+        projection_type="natural earth",
+        showland=True,
+        landcolor="rgb(243, 243, 243)",
+        countrycolor="rgb(204, 204, 204)"
+    )
+    fig_geo.update_layout(
+        title=dict(
+            text=f"<b>{t_dict['sub_geo'].format(min_m=selected_mag_range[0], max_m=selected_mag_range[1])}</b>",
+            x=0.5,
+            xanchor="center"
+        ),
+        height=500,
+        showlegend=False,
+        template="plotly_white",
+        margin=dict(l=10, r=10, t=50, b=10)
+    )
+    st.plotly_chart(fig_geo, use_container_width=True)
 
-    # 2. Scatter Profundidad vs Magnitud (Fila 2)
-    fig.add_trace(
+    # Espaciado con 2 saltos de línea HTML
+    st.markdown("<br><br>", unsafe_allow_html=True)
+
+    # 2. Scatter Profundidad vs Magnitud
+    fig_scatter = go.Figure()
+    fig_scatter.add_trace(
         go.Scatter(
             x=df_filtered["depth"],
             y=df_filtered["magnitude"],
@@ -169,45 +175,53 @@ def render_dashboard(df: pd.DataFrame, t_dict: dict):
                 opacity=0.7,
                 showscale=False
             )
-        ),
-        row=2, col=1
+        )
     )
+    fig_scatter.update_xaxes(title_text=t_dict["depth_axis"])
+    fig_scatter.update_yaxes(title_text=t_dict["mag_axis"])
+    fig_scatter.update_layout(
+        title=dict(
+            text=f"<b>{t_dict['sub_scatter']}</b>",
+            x=0.5,
+            xanchor="center"
+        ),
+        height=400,
+        showlegend=False,
+        template="plotly_white",
+        margin=dict(l=10, r=10, t=50, b=10)
+    )
+    st.plotly_chart(fig_scatter, use_container_width=True)
 
-    # 3. Histograma de Magnitudes (Fila 3)
-    fig.add_trace(
+    # Espaciado con 2 saltos de línea HTML
+    st.markdown("<br><br>", unsafe_allow_html=True)
+
+    # 3. Histograma de Magnitudes
+    fig_hist = go.Figure()
+    fig_hist.add_trace(
         go.Histogram(
             x=df_filtered["magnitude"],
             xbins=dict(size=0.2),
             marker_color="#E74C3C",
             opacity=0.8
+        )
+    )
+    fig_hist.update_xaxes(title_text=t_dict["mag_axis"])
+    fig_hist.update_yaxes(title_text=t_dict["count_axis"])
+    fig_hist.update_layout(
+        title=dict(
+            text=f"<b>{t_dict['sub_hist']}</b>",
+            x=0.5,
+            xanchor="center"
         ),
-        row=3, col=1
-    )
-
-    # Configuración del mapa y ejes
-    fig.update_geos(
-        projection_type="natural earth",
-        showland=True,
-        landcolor="rgb(243, 243, 243)",
-        countrycolor="rgb(204, 204, 204)"
-    )
-
-    # Ejes Fila 2
-    fig.update_xaxes(title_text=t_dict["depth_axis"], row=2, col=1)
-    fig.update_yaxes(title_text=t_dict["mag_axis"], row=2, col=1)
-
-    # Ejes Fila 3
-    fig.update_xaxes(title_text=t_dict["mag_axis"], row=3, col=1)
-    fig.update_yaxes(title_text=t_dict["count_axis"], row=3, col=1)
-
-    fig.update_layout(
-        height=1150,
+        height=400,
         showlegend=False,
         template="plotly_white",
-        margin=dict(l=10, r=10, t=40, b=10)
+        margin=dict(l=10, r=10, t=50, b=10)
     )
+    st.plotly_chart(fig_hist, use_container_width=True)
 
-    st.plotly_chart(fig, use_container_width=True)
+    # Espaciado antes de la sección final
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
 
 def run_ols_regression(df: pd.DataFrame, t_dict: dict):
@@ -221,7 +235,7 @@ def run_ols_regression(df: pd.DataFrame, t_dict: dict):
         return
 
     model = smf.ols("sig ~ magnitude + depth", data=data_model).fit()
-
+    
     st.subheader(t_dict["ols_header"])
     st.text(str(model.summary()))
 
