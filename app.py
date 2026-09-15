@@ -5,7 +5,7 @@ from plotly.subplots import make_subplots
 import statsmodels.formula.api as smf
 import streamlit as st
 
-# Diccionario de traducciones
+# Diccionario de traducciones extendido con el histograma
 TRANSLATIONS = {
     "Español": {
         "page_title": "Análisis Global de Terremotos",
@@ -19,9 +19,11 @@ TRANSLATIONS = {
         "no_data": "No hay eventos sísmicos en el rango de magnitud seleccionado.",
         "sub_geo": "Distribución Geográfica (Magnitud: {min_m} - {max_m})",
         "sub_scatter": "Relación entre Profundidad y Magnitud",
+        "sub_hist": "Distribución de Frecuencia de Magnitudes",
         "depth_colorbar": "Profundidad (km)",
         "depth_axis": "Profundidad (km)",
         "mag_axis": "Magnitud",
+        "count_axis": "Frecuencia (Cantidad de Sismos)",
         "ols_header": "Resumen del Modelo Estadístico (OLS)"
     },
     "English": {
@@ -36,9 +38,11 @@ TRANSLATIONS = {
         "no_data": "No seismic events found in the selected magnitude range.",
         "sub_geo": "Geographical Distribution (Magnitude: {min_m} - {max_m})",
         "sub_scatter": "Relationship between Depth and Magnitude",
+        "sub_hist": "Magnitude Frequency Distribution",
         "depth_colorbar": "Depth (km)",
         "depth_axis": "Depth (km)",
         "mag_axis": "Magnitude",
+        "count_axis": "Frequency (Count of Earthquakes)",
         "ols_header": "Statistical Model Summary (OLS)"
     }
 }
@@ -88,7 +92,7 @@ def load_and_clean_data(file_path: str = "earthquake_1995-2023.csv") -> pd.DataF
 
 
 def render_dashboard(df: pd.DataFrame, t_dict: dict):
-    """Genera y despliega las visualizaciones dinámicas con textos traducidos."""
+    """Genera y despliega las visualizaciones dinámicas incluyendo el histograma de magnitudes."""
     required_cols = {"latitude", "longitude", "magnitude", "depth"}
     if not required_cols.issubset(df.columns):
         st.warning(t_dict["missing_cols"].format(
@@ -119,19 +123,20 @@ def render_dashboard(df: pd.DataFrame, t_dict: dict):
         st.info(t_dict["no_data"])
         return
 
-    # Construcción de subplots
+    # Construcción de subplots (3 filas x 1 columna)
     fig = make_subplots(
-        rows=2, cols=1,
+        rows=3, cols=1,
         subplot_titles=(
             t_dict["sub_geo"].format(
                 min_m=selected_mag_range[0], max_m=selected_mag_range[1]),
-            t_dict["sub_scatter"]
+            t_dict["sub_scatter"],
+            t_dict["sub_hist"]
         ),
-        specs=[[{"type": "geo"}], [{"type": "xy"}]],
-        vertical_spacing=0.12
+        specs=[[{"type": "geo"}], [{"type": "xy"}], [{"type": "xy"}]],
+        vertical_spacing=0.08
     )
 
-    # Mapa interactivo
+    # 1. Mapa interactivo (Fila 1)
     fig.add_trace(
         go.Scattergeo(
             lat=df_filtered["latitude"],
@@ -143,15 +148,14 @@ def render_dashboard(df: pd.DataFrame, t_dict: dict):
                 size=df_filtered["magnitude"] * 2.5,
                 color=df_filtered["depth"],
                 colorscale="Viridis_r",
-                colorbar=dict(
-                    title=t_dict["depth_colorbar"], len=0.45, y=0.78),
+                colorbar=dict(title=t_dict["depth_colorbar"], len=0.3, y=0.85),
                 showscale=True
             )
         ),
         row=1, col=1
     )
 
-    # Scatter Profundidad vs Magnitud
+    # 2. Scatter Profundidad vs Magnitud (Fila 2)
     fig.add_trace(
         go.Scatter(
             x=df_filtered["depth"],
@@ -169,17 +173,35 @@ def render_dashboard(df: pd.DataFrame, t_dict: dict):
         row=2, col=1
     )
 
+    # 3. Histograma de Magnitudes (Fila 3)
+    fig.add_trace(
+        go.Histogram(
+            x=df_filtered["magnitude"],
+            xbins=dict(size=0.2),
+            marker_color="#E74C3C",
+            opacity=0.8
+        ),
+        row=3, col=1
+    )
+
+    # Configuración del mapa y ejes
     fig.update_geos(
         projection_type="natural earth",
         showland=True,
         landcolor="rgb(243, 243, 243)",
         countrycolor="rgb(204, 204, 204)"
     )
+
+    # Ejes Fila 2
     fig.update_xaxes(title_text=t_dict["depth_axis"], row=2, col=1)
     fig.update_yaxes(title_text=t_dict["mag_axis"], row=2, col=1)
 
+    # Ejes Fila 3
+    fig.update_xaxes(title_text=t_dict["mag_axis"], row=3, col=1)
+    fig.update_yaxes(title_text=t_dict["count_axis"], row=3, col=1)
+
     fig.update_layout(
-        height=850,
+        height=1150,
         showlegend=False,
         template="plotly_white",
         margin=dict(l=10, r=10, t=40, b=10)
