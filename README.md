@@ -1,3 +1,7 @@
+Carlos Alberto Ferrer Rodriguez
+www.linkedin.com/in/carlos-ferrer-bog
+car_ferrer@hotmail.com
+
 Acceso publica a la aplicacion
 https://globalearthquakes.onrender.com/
 
